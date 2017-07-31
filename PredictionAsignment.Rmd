@@ -1,0 +1,89 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Navonil Banerjee"
+date: "1 August 2017"
+output: html_document
+---
+
+#Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+#Data loading & preprocessing
+
+```{r Data loading & pre-processing,echo=TRUE,results='hold'}
+setwd("C:/Users/Navonil/Documents/GitRepo/MC_Learning") #Setting work directory where we have saved training & testing data
+pmldata<-read.csv("training.csv", na.strings=c("", "NA", "#DIV/0!"))
+submitdata<-read.csv("testing.csv",na.strings =c("", "NA", "#DIV/0!"))
+dim(pmldata)
+library(caret)
+library(randomForest)
+missing_columns<-apply(pmldata,2,function(x)sum(is.na(x)))/nrow(pmldata)
+
+Processedtrainingdata<-pmldata[,missing_columns<0.1]##Considering variables containg less than 10% missing values
+FinalTrainingdata<-Processedtrainingdata[,-(1:7)] #As variables in column 1 to 7 are not so usefull
+sum(is.na(FinalTrainingdata))
+dim(FinalTrainingdata)
+```
+
+No missing values are present in final training data.Now lets proceed with the modeling.
+
+As Random Forest is one of the best classification prediction models will build Random Forest.
+#Model build up
+
+```{r model build up ,echo=TRUE,results='hold',cache=TRUE}
+set.seed(1234)
+
+index<-createDataPartition(FinalTrainingdata$classe,p=0.75,list=FALSE)
+training<-FinalTrainingdata[index,]
+testing<-FinalTrainingdata[-index,]
+fit.rf<-randomForest(classe~.,data=training)
+print(fit.rf)
+```
+
+#Varaible of importance
+
+```{r imp variables}
+library(plyr)
+impVars <- varImp(fit.rf)
+varnames<-rownames(impVars)
+varOrders<-data.frame(varnames=varnames,impVars)
+varOrders<-arrange(varOrders,desc(Overall))
+ggplot(varOrders, aes(x=reorder(varnames,desc(Overall)),y=Overall,fill=varnames)) + 
+  geom_bar(stat="identity") + theme(legend.position="none")+
+  xlab("Feature Name")+guides(fill=FALSE)+
+  ylab("Importance Value")+ggtitle("Features Importance")+
+  theme(axis.text.x=element_text(angle=75,hjust=1)) + 
+  theme(plot.title = element_text(size=14, face="bold"))
+```
+
+
+
+
+#Validation
+
+```{r validation}
+prediction<-predict(fit.rf,testing) 
+confusionMatrix(prediction,testing$classe)
+```
+
+Accuracy of the model fit on test dataset is 99.53% & the out of bag sample error rate is 0.47% which is pretty low.So we are not building any other model.
+
+#Final Prediction
+
+```{r final prediction on 20 obs dataset,results='hold'}
+predict(fit.rf,submitdata)
+```
+Submitting above result to the grader, we can get the perfect 100% correctness.
+
+
